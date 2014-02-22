@@ -1,8 +1,12 @@
-package edu.buffalo.cse.cse486586.groupmessenger;
+ package edu.buffalo.cse.cse486586.groupmessenger;
+
 
 import android.content.ContentProvider;
 import android.content.ContentValues;
+import android.content.Context;
 import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
 import android.net.Uri;
 import android.util.Log;
 
@@ -25,19 +29,31 @@ import android.util.Log;
  *
  */
 public class GroupMessengerProvider extends ContentProvider {
+	static final String TAG_INSERT = "Group Messenger Provider";
+	static final String TAG_QUERY = "Query";
+	public static final String AUTHORITY = "content://edu.buffalo.cse.cse486586.groupmessenger.provider";
+	public static final Uri CONTENT_URI = Uri.parse(AUTHORITY);
+	public static final String DB_NAME="groupmessenger.db";
+	public static final String TABLE_NAME="messages";
+	public static final int DB_VERSION=1;
+	public static final String KEY_FIELD = "key";
+	public static final String VALUE_FIELD = "value";
+	
+	private DBHelper dbHelper;
+	private SQLiteDatabase db;
+	
+	
+    
 
     @Override
-    public int delete(Uri uri, String selection, String[] selectionArgs) {
-        // You do not need to implement this.
-        return 0;
+    public boolean onCreate() {
+        // If you need to perform any one-time initialization task, please do it here.
+    	
+    	dbHelper = new DBHelper(getContext());
+    	
+        return false;
     }
-
-    @Override
-    public String getType(Uri uri) {
-        // You do not need to implement this.
-        return null;
-    }
-
+    
     @Override
     public Uri insert(Uri uri, ContentValues values) {
         /*
@@ -50,14 +66,20 @@ public class GroupMessengerProvider extends ContentProvider {
          * internal storage option that I used in PA1. If you want to use that option, please
          * take a look at the code for PA1.
          */
-        Log.v("insert", values.toString());
-        return uri;
-    }
-
-    @Override
-    public boolean onCreate() {
-        // If you need to perform any one-time initialization task, please do it here.
-        return false;
+    	
+    	db = dbHelper.getWritableDatabase();
+		long id= db.insertWithOnConflict(TABLE_NAME, null, values, SQLiteDatabase.CONFLICT_REPLACE );
+    	
+        Log.d(TAG_INSERT, "insert of provider");
+        if(id!=-1)
+		{
+		return Uri.withAppendedPath(uri	, Long.toString(id));
+		}
+		else
+		{
+			return uri;
+		}
+		
     }
 
     @Override
@@ -74,8 +96,11 @@ public class GroupMessengerProvider extends ContentProvider {
          * recommend building a MatrixCursor described at:
          * http://developer.android.com/reference/android/database/MatrixCursor.html
          */
-        Log.v("query", selection);
-        return null;
+    	Log.d(TAG_QUERY, "inside query"+selectionArgs[0].toString());
+    	db = dbHelper.getReadableDatabase();
+		Cursor cursor=db.query(GroupMessengerProvider.TABLE_NAME, projection, selection	, selectionArgs , null, null, sortOrder);
+		
+		return cursor;
     }
 
     @Override
@@ -83,4 +108,48 @@ public class GroupMessengerProvider extends ContentProvider {
         // You do not need to implement this.
         return 0;
     }
+    
+    @Override
+    public int delete(Uri uri, String selection, String[] selectionArgs) {
+        // You do not need to implement this.
+        return 0;
+    }
+
+    @Override
+    public String getType(Uri uri) {
+        // You do not need to implement this.
+        return null;
+    }
+
+
+    
+    class DBHelper extends SQLiteOpenHelper{
+
+		static final String TAG= "DBHelper";
+		public DBHelper(Context context) {
+			super(context, GroupMessengerProvider.DB_NAME, null, GroupMessengerProvider.DB_VERSION);
+			// TODO Auto-generated constructor stub
+		}
+
+		@Override
+		public void onCreate(SQLiteDatabase db) {
+			// TODO Auto-generated method stub
+			
+			String sql= String.format("create table %s "+"(%s text primary key, %s text)", GroupMessengerProvider.TABLE_NAME, GroupMessengerProvider.KEY_FIELD,
+					GroupMessengerProvider.VALUE_FIELD);
+			Log.d(TAG,"On create DB Helper");
+			
+			db.execSQL(sql);
+			
+		}
+
+		@Override
+		public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+			// TODO Auto-generated method stub
+			db.execSQL("drop if exists "+ GroupMessengerProvider.TABLE_NAME);
+			onCreate(db);
+			}
+		
+	}
 }
+
