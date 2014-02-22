@@ -96,9 +96,10 @@ public class GroupMessengerProvider extends ContentProvider {
          * recommend building a MatrixCursor described at:
          * http://developer.android.com/reference/android/database/MatrixCursor.html
          */
-    	Log.d(TAG_QUERY, "inside query"+selectionArgs[0].toString());
+    	Log.d(TAG_QUERY, "inside query "+selection);
+    	String [] temp = {selection};
     	db = dbHelper.getReadableDatabase();
-		Cursor cursor=db.query(GroupMessengerProvider.TABLE_NAME, projection, selection	, selectionArgs , null, null, sortOrder);
+		Cursor cursor=db.query(GroupMessengerProvider.TABLE_NAME, projection, "key=?"	, temp , null, null, sortOrder);
 		
 		return cursor;
     }

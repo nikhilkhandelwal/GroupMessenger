@@ -122,12 +122,13 @@ public class OnPTestClickListener implements OnClickListener {
         try {
             for (int i = 0; i < TEST_CNT; i++) {
             	
-                String keyval  = (String) mContentValues[i].get(KEY_FIELD);
+                String key  = (String) mContentValues[i].get(KEY_FIELD);
                 String val = (String) mContentValues[i].get(VALUE_FIELD);
                 
-                String [] key={keyval};
+                //String [] key={keyval};
 
-                Cursor resultCursor = mContentResolver.query(mUri, null, "key=?", key, null);
+                Cursor resultCursor = mContentResolver.query(mUri, null, key, null, null);
+                Log.e(TAG, "Key sent "+key);
                 if (resultCursor == null) {
                     Log.e(TAG, "Result null");
                     throw new Exception();
@@ -151,7 +152,7 @@ public class OnPTestClickListener implements OnClickListener {
 
                 String returnKey = resultCursor.getString(keyIndex);
                 String returnValue = resultCursor.getString(valueIndex);
-                if (!(returnKey.equals(key[0]) && returnValue.equals(val))) {
+                if (!(returnKey.equals(key) && returnValue.equals(val))) {
                     Log.e(TAG, "(key, value) pairs don't match\n");
                     resultCursor.close();
                     throw new Exception();
