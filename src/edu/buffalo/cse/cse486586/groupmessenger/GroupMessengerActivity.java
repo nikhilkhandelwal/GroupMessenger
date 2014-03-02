@@ -1,22 +1,20 @@
 package edu.buffalo.cse.cse486586.groupmessenger;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
 
 import android.app.Activity;
 import android.content.ContentValues;
 import android.content.Context;
-import android.database.Cursor;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -51,6 +49,7 @@ public class GroupMessengerActivity extends Activity {
 	private static int messageKey = 0;
 
 	static final int SERVER_PORT = 10000;
+	static ArrayList<Message> pendingMessageQueue = new ArrayList<Message>();
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -132,11 +131,13 @@ public class GroupMessengerActivity extends Activity {
 
 	private class ServerTask extends AsyncTask<ServerSocket, String, Void> {
 
+		
 		@Override
 		protected Void doInBackground(ServerSocket... sockets) {
 			ServerSocket serverSocket = sockets[0];
 			Socket clientSocket = null;
-			BufferedReader input;
+
+			int lastMessageRecieved=-1;
 
 			/*
 			 * TODO: Fill in your server code that receives messages and passes
@@ -145,54 +146,102 @@ public class GroupMessengerActivity extends Activity {
 			while (!Thread.currentThread().isInterrupted()) {
 				try {
 					clientSocket = serverSocket.accept();
-					/*input = new BufferedReader(new InputStreamReader(
-							clientSocket.getInputStream()));*/ 
+					/*
+					 * input = new BufferedReader(new InputStreamReader(
+					 * clientSocket.getInputStream()));
+					 */
 					InputStream is = clientSocket.getInputStream();
-					Message obj =null;
-					   ObjectInputStream ois = new ObjectInputStream(is);   
-					   try {
-						obj = (Message)ois.readObject();
+					Message obj = null;
+					ObjectInputStream ois = new ObjectInputStream(is);
+					try {
+						obj = (Message) ois.readObject();
 					} catch (ClassNotFoundException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
-					} 
+					}
 					Log.d(TAG, "server started");
 
-					//String str = input.readLine();
-					String str=null;
-					try {
-						str = obj.getMessage();
-					} catch (Exception e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-					// creating content values object
-					ContentValues cv = new ContentValues();
-					cv.put(KEY_FIELD, Integer.toString(messageKey));
-					cv.put(VALUE_FIELD, "val" + str);
+					// String str = input.readLine();
+					String str = obj.getMessage();
+					if (obj.getSerialNumber() == -1) {
+						obj.setSerialNumber(messageKey++);
 
-					//inserting in content provider
-					getContentResolver().insert(CONTENT_URI, cv);
-					Log.e(TAG, "key " + Integer.toString(messageKey)
-							+ " value " + str + " is inserted in provider");
-					//testing code for query of content provider
-						Cursor resultCursor = getContentResolver().query(
-								CONTENT_URI, null, Integer.toString(messageKey),
-								null, null);
-	
-						int keyIndex = resultCursor.getColumnIndex(KEY_FIELD);
-						int valueIndex = resultCursor.getColumnIndex(VALUE_FIELD);
-						if( resultCursor != null && resultCursor.moveToFirst() ){
-						
-						resultCursor.moveToFirst();
-	
-						Log.e(TAG, "key " + resultCursor.getString(keyIndex)
-								+ " value " + resultCursor.getString(valueIndex)
-								+ " is retrieved from provider");
+						for (int i = 0; i < 4; i++) {
+							Socket socket = null;
+
+							switch (i) {
+							case 0:
+								socket = new Socket(
+										InetAddress.getByAddress(new byte[] {
+												10, 0, 2, 2 }),
+										Integer.parseInt(REMOTE_PORT0));
+								break;
+							case 1:
+								socket = new Socket(
+										InetAddress.getByAddress(new byte[] {
+												10, 0, 2, 2 }),
+										Integer.parseInt(REMOTE_PORT1));
+								break;
+							case 2:
+								socket = new Socket(
+										InetAddress.getByAddress(new byte[] {
+												10, 0, 2, 2 }),
+										Integer.parseInt(REMOTE_PORT2));
+								break;
+							case 3:
+								socket = new Socket(
+										InetAddress.getByAddress(new byte[] {
+												10, 0, 2, 2 }),
+										Integer.parseInt(REMOTE_PORT3));
+								break;
+							case 4:
+								socket = new Socket(
+										InetAddress.getByAddress(new byte[] {
+												10, 0, 2, 2 }),
+										Integer.parseInt(REMOTE_PORT4));
+								break;
+
+							}
+
+							ObjectOutputStream outToClient = new ObjectOutputStream(
+									socket.getOutputStream());
+							outToClient.writeObject(obj);
+							// Log.d(TAG, "message sent: "+msgToSend);
+							socket.close();
 						}
-					messageKey++;
+					} else {
+						if (obj.getSerialNumber() == lastMessageRecieved+1) {
+							// creating content values object
+							pendingMessageQueue.add(obj);
+							Collections.sort(pendingMessageQueue);
+							
+							Iterator<Message> iterator = pendingMessageQueue.iterator();
+							do{
+							ContentValues cv = new ContentValues();
+							cv.put(KEY_FIELD,
+									Integer.toString(obj.getSerialNumber()));
+							cv.put(VALUE_FIELD, obj.getMessage());
 
-					publishProgress(str);
+							// inserting in content provider
+							getContentResolver().insert(CONTENT_URI, cv);
+							Log.e(TAG,
+									"key "
+											+ Integer.toString(obj
+													.getSerialNumber())
+											+ " value " + str
+											+ " is inserted in provider");
+							// testing code for query of content provider
+						
+							publishProgress(obj.getMessage());
+							lastMessageRecieved = obj.getSerialNumber();
+							}while(iterator.next().getSerialNumber()==lastMessageRecieved+1);
+							
+						}
+						else
+						{
+							pendingMessageQueue.add(obj);
+						}
+					}
 					// Log.d("MainActivity", "message recieved"+st);
 				} catch (IOException e) {
 					e.printStackTrace();
@@ -242,56 +291,18 @@ public class GroupMessengerActivity extends Activity {
 		@Override
 		protected Void doInBackground(String... msgs) {
 			try {
-				/*
-				 * if (msgs[1].equals(REMOTE_PORT0)) remotePort = REMOTE_PORT1;
-				 */
-				for (int i = 0; i < 4; i++) {
-					Socket socket = null;
+				Socket socket = null;
 
-					switch (i) {
-					case 0:
-						socket = new Socket(
-								InetAddress.getByAddress(new byte[] { 10, 0, 2,
-										2 }), Integer.parseInt(REMOTE_PORT0));
-						break;
-					case 1:
-						socket = new Socket(
-								InetAddress.getByAddress(new byte[] { 10, 0, 2,
-										2 }), Integer.parseInt(REMOTE_PORT1));
-						break;
-					case 2:
-						socket = new Socket(
-								InetAddress.getByAddress(new byte[] { 10, 0, 2,
-										2 }), Integer.parseInt(REMOTE_PORT2));
-						break;
-					case 3:
-						socket = new Socket(
-								InetAddress.getByAddress(new byte[] { 10, 0, 2,
-										2 }), Integer.parseInt(REMOTE_PORT3));
-						break;
-					case 4:
-						socket = new Socket(
-								InetAddress.getByAddress(new byte[] { 10, 0, 2,
-										2 }), Integer.parseInt(REMOTE_PORT4));
-						break;
+				socket = new Socket(InetAddress.getByAddress(new byte[] { 10,
+						0, 2, 2 }), Integer.parseInt(REMOTE_PORT0));
 
-					}
-
-				//	String msgToSend = msgs[0];
-					/*
-					 * TODO: Fill in your client code that sends out a message.
-					 */
-					/*PrintWriter out = new PrintWriter(new BufferedWriter(
-							new OutputStreamWriter(socket.getOutputStream())),
-							true);
-					out.println(msgToSend);*/
-					Message msgToSend = new Message();
-					msgToSend.setMessage(msgs[0]);
-					ObjectOutputStream outToClient = new ObjectOutputStream(socket.getOutputStream());
-					 outToClient.writeObject(msgToSend); 
-					// Log.d(TAG, "message sent: "+msgToSend);
-					socket.close();
-				}
+				Message msgToSend = new Message();
+				msgToSend.setMessage(msgs[0]);
+				ObjectOutputStream outToClient = new ObjectOutputStream(
+						socket.getOutputStream());
+				outToClient.writeObject(msgToSend);
+				// Log.d(TAG, "message sent: "+msgToSend);
+				socket.close();
 			} catch (UnknownHostException e) {
 				Log.e(TAG, "ClientTask UnknownHostException");
 			} catch (IOException e) {

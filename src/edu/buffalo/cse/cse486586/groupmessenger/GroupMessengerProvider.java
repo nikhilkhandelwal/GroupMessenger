@@ -35,7 +35,7 @@ public class GroupMessengerProvider extends ContentProvider {
 	public static final Uri CONTENT_URI = Uri.parse(AUTHORITY);
 	public static final String DB_NAME="groupmessenger.db";
 	public static final String TABLE_NAME="messages";
-	public static final int DB_VERSION=1;
+	public static final int DB_VERSION=7;
 	public static final String KEY_FIELD = "key";
 	public static final String VALUE_FIELD = "value";
 	
@@ -147,7 +147,7 @@ public class GroupMessengerProvider extends ContentProvider {
 		@Override
 		public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
 			// TODO Auto-generated method stub
-			db.execSQL("drop if exists "+ GroupMessengerProvider.TABLE_NAME);
+			db.execSQL("drop table if exists "+ GroupMessengerProvider.TABLE_NAME);
 			onCreate(db);
 			}
 		
